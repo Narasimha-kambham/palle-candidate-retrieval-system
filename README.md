@@ -30,110 +30,46 @@ What makes PCRS fundamentally superior to traditional keyword-matching ATS and s
 
 ```mermaid
 flowchart TB
+    subgraph UI ["Client Layer (Streamlit)"]
+        A["Recruiter / User"] --> B["Streamlit UI"]
+        B -->|"Upload JD & Candidate Excel + Set Weights"| C["API Client"]
+        D["Ranked Results & Excel Download"] --> B
+    end
 
-    %% =========================
-    %% CLIENT
-    %% =========================
+    subgraph API ["Backend Layer (FastAPI)"]
+        C -->|"POST /api/recruitment/search"| E["Search Endpoint"]
+        
+        subgraph JD_Pipeline ["1. Job Description Analysis"]
+            E --> F["Unified Document Extractor (PDF/DOCX/TXT)"]
+            F --> G["LLM Structured Extractor (Pydantic Requirements)"]
+        end
 
-    A[HR / Recruiter] --> B[Streamlit Frontend]
+        subgraph Storage ["Pre-indexed Data Stores"]
+            DB1[("Resume Text Store (JSON)")]
+            DB2[("Resume Vector Store (FAISS)")]
+        end
 
-    B --> C[Upload Job Description PDF / DOCX / Text]
-    B --> D[Upload Candidate Excel]
-    B --> E[Configure Ranking Weights]
+        subgraph Retrieval ["2. Hybrid Retrieval Engine"]
+            G --> H["Semantic Retriever (Whole + Chunk + Requirement)"]
+            G --> I["Exact Keyword Retriever (Skill/Exp/Edu Matching)"]
+            DB2 --> H
+            DB1 --> I
+            
+            H --> J["Candidate Aggregator"]
+            I --> J
+        end
 
-    %% =========================
-    %% API
-    %% =========================
+        subgraph Rerank ["3. Weighted Reranker & Export"]
+            J --> K["Reranker & Normalizer"]
+            E -.->|"Weights"| K
+            K --> L["Excel Exporter"]
+            E -.->|"Original Excel"| L
+            L --> M["ranked_candidates.xlsx"]
+        end
+    end
 
-    C --> F[FastAPI Backend]
-    D --> F
-    E --> F
-
-    %% =========================
-    %% INPUT PROCESSING
-    %% =========================
-
-    F --> G[JD Text Extraction]
-
-    G --> H[LLM Requirement Extraction]
-
-    H --> H1[Required Skills]
-    H --> H2[Preferred Skills]
-    H --> H3[Experience Requirements]
-    H --> H4[Education Requirements]
-
-    %% =========================
-    %% RESUME DATA
-    %% =========================
-
-    D --> I[Candidate Excel]
-
-    I --> J[Candidate / Resume Metadata]
-
-    J --> K[Resume Text Store]
-
-    K --> L[Resume Vector Store]
-
-    %% =========================
-    %% RETRIEVAL
-    %% =========================
-
-    H --> M[Semantic Retrieval]
-    L --> M
-
-    M --> M1[Whole Resume Search]
-    M --> M2[Resume Chunk Search]
-    M --> M3[Requirement Search]
-
-    H --> N[Exact Matching]
-    K --> N
-
-    N --> N1[Required Skills]
-    N --> N2[Preferred Skills]
-    N --> N3[Experience]
-    N --> N4[Education]
-
-    %% =========================
-    %% AGGREGATION
-    %% =========================
-
-    M --> O[Candidate Aggregator]
-    N --> O
-
-    O --> P[Unified Candidate Evidence]
-
-    %% =========================
-    %% RERANKING
-    %% =========================
-
-    P --> Q[Reranker]
-
-    E --> Q
-
-    Q --> Q1[Semantic Score]
-    Q --> Q2[Exact Match Score]
-
-    Q1 --> Q3[Semantic Normalization]
-    Q3 --> Q4[Weighted Final Score]
-
-    Q2 --> Q4
-
-    Q4 --> R[Ranked Candidates]
-
-    %% =========================
-    %% OUTPUT
-    %% =========================
-
-    R --> S[Excel Exporter]
-
-    I --> S
-
-    S --> T[Ranked Candidate Excel]
-
-    T --> B
-
-    B --> U[View Ranked Results]
-    B --> V[Download Excel]
+    K -->|"Ranked Candidates JSON"| D
+    M -->|"Downloadable File Stream"| D
 ```
 
 ---
@@ -178,6 +114,7 @@ palle-candidate-retrieval-system/
 You can get started either by **cloning the GitHub repository** or from a **local directory copy**.
 
 ### Option A: Start with Git Repository
+
 ```bash
 # 1. Clone the repository
 git clone https://github.com/Narasimha-kambham/palle-candidate-retrieval-system.git
@@ -199,6 +136,7 @@ pip install -r requirements.txt
 ```
 
 ### Option B: Start from Existing Local Directory
+
 ```bash
 # 1. Open the project folder
 cd d:/palle-candidate-retrieval-system
@@ -214,7 +152,9 @@ pip install -r requirements.txt
 ---
 
 ### 🔑 Environment Variables
+
 Create a `.env` file in the project root directory:
+
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
