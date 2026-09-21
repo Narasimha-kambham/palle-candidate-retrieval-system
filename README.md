@@ -175,32 +175,46 @@ palle-candidate-retrieval-system/
 
 ## 🛠️ Setup & Installation
 
-### 1. Clone & create virtual environment
+You can get started either by **cloning the GitHub repository** or from a **local directory copy**.
 
+### Option A: Start with Git Repository
 ```bash
-git clone <repo-url>
+# 1. Clone the repository
+git clone https://github.com/Narasimha-kambham/palle-candidate-retrieval-system.git
 cd palle-candidate-retrieval-system
 
-# Create and activate virtual environment
+# 2. Create virtual environment
 python -m venv .venv
 
-# On Windows PowerShell:
+# 3. Activate virtual environment
+# Windows (PowerShell):
 .venv\Scripts\Activate.ps1
-
-# On Linux/macOS:
+# Windows (Command Prompt):
+.venv\Scripts\activate.bat
+# Linux / macOS:
 source .venv/bin/activate
-```
 
-### 2. Install dependencies
-
-```bash
+# 4. Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Environment Variables
+### Option B: Start from Existing Local Directory
+```bash
+# 1. Open the project folder
+cd d:/palle-candidate-retrieval-system
 
-Create a `.env` file in the project root:
+# 2. Create and activate virtual environment (if not already created)
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 
+# 3. Install dependencies
+pip install -r requirements.txt
+```
+
+---
+
+### 🔑 Environment Variables
+Create a `.env` file in the project root directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
