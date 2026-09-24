@@ -5,10 +5,15 @@ import pandas as pd
 def export_ranked_candidates(
     input_excel,
     output_excel,
-    ranked_candidates
+    ranked_candidates,
+    downloaded_records=None,
+    resumes=None
 ):
     df = pd.read_excel(input_excel)
 
+    # --------------------------------------------------
+    # Sheet 1: Primary Result Sheet (Ranked Candidates)
+    # --------------------------------------------------
     rows = []
 
     for rank, candidate in enumerate(
@@ -50,10 +55,97 @@ def export_ranked_candidates(
         exist_ok=True
     )
 
-    output_df.to_excel(
-        output_excel,
-        index=False
-    )
+    # --------------------------------------------------
+    # Sheet 2: Processing Status (Audit / Tracking Sheet)
+    # --------------------------------------------------
+    downloads_by_row = {
+        record["source_row"]: record
+        for record in (downloaded_records or [])
+        if "source_row" in record
+    }
+
+    parses_by_row = {
+        record["source_row"]: record
+        for record in (resumes or [])
+        if "source_row" in record
+    }
+
+    selected_source_rows = {
+        candidate["source_row"]
+        for candidate in ranked_candidates
+    }
+
+    status_rows = []
+
+    for index, row in df.iterrows():
+        source_row = index + 2
+
+        download_rec = downloads_by_row.get(source_row)
+        parse_rec = parses_by_row.get(source_row)
+
+        if download_rec is not None:
+            download_status = download_rec.get("status") or ""
+            download_error = download_rec.get("error") or ""
+        else:
+            download_status = ""
+            download_error = ""
+
+        if parse_rec is not None:
+            parse_status = parse_rec.get("status") or ""
+            parse_error = parse_rec.get("error") or ""
+        else:
+            parse_status = ""
+            parse_error = ""
+
+        if download_status == "missing_resume_url":
+            final_status = "skipped"
+        elif download_status == "download_failed":
+            final_status = "failed"
+        elif parse_status == "text_extraction_failed":
+            final_status = "failed"
+        elif parse_status == "text_extracted":
+            if source_row in selected_source_rows:
+                final_status = "selected"
+            else:
+                final_status = "processed_not_selected"
+        elif parse_status == "skipped":
+            # Only resolve this using the authoritative download result.
+            if download_status == "missing_resume_url":
+                final_status = "skipped"
+            elif download_status == "download_failed":
+                final_status = "failed"
+            else:
+                final_status = "skipped"
+        else:
+            final_status = ""
+
+        name = row.get("Name")
+        resume_path = row.get("Resume Path")
+
+        status_rows.append({
+            "Source Row": source_row,
+            "Name": None if pd.isna(name) else str(name).strip(),
+            "Resume Path": None if pd.isna(resume_path) else str(resume_path).strip(),
+            "Download Status": download_status,
+            "Download Error": download_error,
+            "Parse Status": parse_status,
+            "Parse Error": parse_error,
+            "Final Status": final_status,
+        })
+
+    status_df = pd.DataFrame(status_rows)
+
+    with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
+        output_df.to_excel(
+            writer,
+            sheet_name="Ranked Candidates",
+            index=False
+        )
+        status_df.to_excel(
+            writer,
+            sheet_name="Processing Status",
+            index=False
+        )
 
     return output_df
 
@@ -61,12 +153,11 @@ def export_ranked_candidates(
 if __name__ == "__main__":
     from pathlib import Path
 
-    input_excel = "data/input/Tracker.xlsx"
-    output_excel = "data/output/ranked_candidates.xlsx"
+    input_excel = "data/runs/test_job/input/Tracker.xlsx"
+    output_excel = "data/runs/test_job/output/ranked_candidates.xlsx"
 
     output_excel_path = Path(output_excel)
     output_excel_path.parent.mkdir(parents=True, exist_ok=True)
-
 
     test_candidates = [
         {

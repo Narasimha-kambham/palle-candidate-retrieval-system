@@ -6,6 +6,7 @@ def retrieve_exact_matches(
 
     results = []
 
+    # List of tuples: (requirement_type: str, requirement: SearchableRequirement)
     requirements = []
 
     # --------------------------------------------------
@@ -41,6 +42,7 @@ def retrieve_exact_matches(
     # Check each resume
     # --------------------------------------------------
 
+    # Iterate through each candidate resume (list of dicts loaded from resumes.json)
     for resume in resumes:
 
         if resume["status"] != "text_extracted":
@@ -100,6 +102,7 @@ def retrieve_exact_matches(
         # Match searchable terms
         # --------------------------------------------------
 
+        # requirement is a SearchableRequirement object containing original_requirement (str) and search_terms (list[str])
         for requirement_type, requirement in requirements:
 
             for term in requirement.search_terms:
@@ -172,107 +175,3 @@ def retrieve_exact_matches(
 
     # Return top-k exact candidates
     return results[:k]
-
-
-# ==========================================================
-# TEST
-# ==========================================================
-
-if __name__ == "__main__":
-
-    from src.ingestion.resume_text_store import load_resume_texts
-    from src.ingestion.document_text_extractor import extract_text_from_pdf
-    from src.processing.jd_requirements import extract_requirements
-
-    # --------------------------------------------------
-    # Load resumes
-    # --------------------------------------------------
-
-    resumes = load_resume_texts(
-        "data/processed/resumes.json"
-    )
-
-    # --------------------------------------------------
-    # Load JD
-    # --------------------------------------------------
-
-    jd_text = extract_text_from_pdf(
-        "data/JD_Forward Deployed Engineer Intern (6 months -Paid).pdf"
-    )
-
-    # --------------------------------------------------
-    # Extract JD requirements
-    # --------------------------------------------------
-
-    jd_requirements = extract_requirements(
-        jd_text
-    )
-
-    # --------------------------------------------------
-    # Exact retrieval
-    # --------------------------------------------------
-
-    results = retrieve_exact_matches(
-        resumes,
-        jd_requirements,
-        k=30
-    )
-
-    # --------------------------------------------------
-    # Display results
-    # --------------------------------------------------
-
-    print("=" * 100)
-    print("EXACT RETRIEVAL")
-    print("=" * 100)
-
-    print(
-        f"Candidates returned : {len(results)}"
-    )
-
-    print(
-        "\nTOP CANDIDATES"
-    )
-
-    print("-" * 100)
-
-    requirement_types = [
-        "required_skills",
-        "preferred_skills",
-        "experience_requirements",
-        "education_requirements",
-        "other_requirements"
-    ]
-
-    for index, result in enumerate(results, start=1):
-
-        print(
-            f"\n{index}. "
-            f"{result['name']} "
-            f"| row={result['source_row']} "
-            f"| total_matched={result['total_matched_count']}"
-        )
-
-        for requirement_type in requirement_types:
-
-            data = result[requirement_type]
-
-            print(
-                f"   {requirement_type}: "
-                f"matched={data['matched_count']}, "
-                f"unmatched={data['unmatched_count']}"
-            )
-
-            if data["matched_terms"]:
-
-                print(
-                    f"      Matched  : "
-                    f"{data['matched_terms']}"
-                )
-
-            if data["unmatched_terms"]:
-
-                print(
-                    f"      Unmatched: "
-                    f"{data['unmatched_terms']}"
-                )

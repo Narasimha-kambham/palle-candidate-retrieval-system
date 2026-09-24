@@ -3,6 +3,18 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Legacy temporary folders
 data/resumes/
 data/vector_store/
-data/output/
+data/output/
+data/input/
+data/processed/
+
+# Request-scoped temporary job runs
+data/runs/*
+!data/runs/.gitkeep
+
+# Server logs
+logs/*.log
+!logs/.gitkeep

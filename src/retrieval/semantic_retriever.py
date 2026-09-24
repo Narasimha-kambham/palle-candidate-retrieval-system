@@ -1,13 +1,3 @@
-from src.ingestion.document_text_extractor import extract_text_from_pdf
-from src.retrieval.resume_vector_store import (
-    create_embedding_model,
-    get_or_create_vector_store,
-)
-from src.processing.jd_requirements import extract_requirements
-
-
-VECTOR_STORE_PATH = "data/vector_store/resumes"
-JD_PATH = "data/JD_Forward Deployed Engineer Intern (6 months -Paid).pdf"
 
 
 def retrieve_by_jd(

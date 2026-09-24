@@ -1,3 +1,4 @@
+from pathlib import Path
 from urllib.parse import urlparse
 import os
 import requests
@@ -11,9 +12,14 @@ def download_resume(url, output_path):
         file.write(response.content)
 
 
-def download_all_resumes(candidates):
+def download_all_resumes(candidates, resumes_dir):
+    if resumes_dir is None:
+        raise ValueError(
+            "resumes_dir is required for request-scoped resume storage"
+        )
 
-    os.makedirs("data/resumes", exist_ok=True)
+    resumes_dir = Path(resumes_dir)
+    resumes_dir.mkdir(parents=True, exist_ok=True)
 
     results = []
 
@@ -37,18 +43,18 @@ def download_all_resumes(candidates):
         parsed_url = urlparse(resume_url)
         filename = os.path.basename(parsed_url.path)
 
-        output_path = os.path.join("data", "resumes", filename)
+        output_path = resumes_dir / filename
 
         result = {
             "source_row": candidate["source_row"],
             "name": candidate["name"],
             "resume_url": resume_url,
-            "local_path": output_path,
+            "local_path": str(output_path),
             "status": None,
             "error": None
         }
 
-        if os.path.exists(output_path):
+        if output_path.exists():
             result["status"] = "already_exists"
             results.append(result)
             continue
@@ -56,16 +62,15 @@ def download_all_resumes(candidates):
         try:
             download_resume(
                 url=resume_url,
-                output_path=output_path
+                output_path=str(output_path)
             )
 
             result["status"] = "downloaded"
 
         except requests.RequestException as e:
             result["status"] = "download_failed"
-            result["error"] = str(e)
+            result["error"] = "Error during download: " + str(e)
 
         results.append(result)
 
     return results
-

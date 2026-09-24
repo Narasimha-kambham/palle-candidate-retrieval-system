@@ -148,15 +148,3 @@ def extract_requirements(jd_text: str):
         prompt,
         JDRequirements
     )
-
-if __name__ == "__main__":
-    from src.ingestion.document_text_extractor import extract_text_from_pdf
-    import json
-
-    jd_text = extract_text_from_pdf("data/JD_Forward Deployed Engineer Intern (6 months -Paid).pdf")
-    requirements = extract_requirements(jd_text)
-
-    print(json.dumps(
-        requirements.model_dump(),
-        indent=4
-    ))

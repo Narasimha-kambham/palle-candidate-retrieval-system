@@ -1,19 +1,38 @@
+# Web API & Server
 fastapi
 uvicorn
 python-multipart
+requests
+
+# Frontend
 streamlit
+
+# Data & Document Processing
 pandas
 openpyxl
 pymupdf
 python-docx
+
+# Configuration & Validation
 pydantic
 python-dotenv
-requests
+
+# LangChain & AI Framework
 langchain
 langchain-core
 langchain-community
 langchain-text-splitters
 langchain-huggingface
+
+# LLM Providers
+google-genai
+langchain-google-genai
+openai
+langchain-openai
+
+# Retrieval & Embeddings
 sentence-transformers
 faiss-cpu
-google-genai
+
+# Testing
+pytest

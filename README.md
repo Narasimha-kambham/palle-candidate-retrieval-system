@@ -1,75 +1,101 @@
 # PCRS — Palle Candidate Retrieval System
 
-An intelligent AI-powered candidate retrieval and reranking engine designed for high-precision recruitment workflows. PCRS matches candidate resumes against Job Descriptions (JDs) using a hybrid approach combining **multi-granularity semantic vector retrieval** and **deterministic exact keyword matching**, producing a ranked and exportable Excel tracker.
+An intelligent, production-ready AI candidate retrieval and reranking engine designed for high-precision recruitment workflows. PCRS matches candidate resumes against Job Descriptions (JDs) using a hybrid approach combining **multi-granularity semantic vector retrieval** (`sentence-transformers/all-mpnet-base-v2` + FAISS) and **deterministic exact keyword matching**, producing a ranked and exportable Excel report.
 
 ---
 
-## 🌟 Unique Selling Propositions (USPs)
+## 🌟 Key Features & USPs
 
-What makes PCRS fundamentally superior to traditional keyword-matching ATS and simple RAG systems:
-
-1. **Multi-Granularity Hybrid Retrieval**:
-   - **Whole Resume Search**: Evaluates the candidate's broad domain fit and general background.
-   - **Chunk-Level Search**: Discovers deep, specific technical details and achievements within individual projects or work experience sections.
-   - **Requirement-Level Semantic Search**: Isolates each extracted JD requirement to match candidates who satisfy specific technical criteria.
-   - **Deterministic Exact Matching**: Strict keyword verification for mandatory certifications, core languages, and explicit qualifications.
-2. **AI Structured Requirement Dissection**:
-   - Uses an LLM with strict schemas (`Pydantic`) to faithfully parse JDs into categorized requirements (_Required Skills, Preferred Skills, Experience, Education_) along with conservative search terms, avoiding hallucinated criteria.
-3. **Multi-Aspect Weighted Reranking & Dynamic Normalization**:
-   - Allows HR/recruiters to adjust weights on the fly (_Semantic vs. Exact, Whole-Resume vs. Best-Chunk vs. Best-Requirement_) to balance conceptual relevance and mandatory constraints.
-   - Dynamically scales and normalizes vector distance scores into intuitive [0, 1] relevance metrics.
-4. **Universal Document & Input Support**:
-   - Ingests JDs in `.pdf`, `.docx`, `.txt` format or direct pasted text.
-   - Automatically processes candidate resumes across multiple document types without code duplication.
-5. **Auditable & Exportable Results**:
-   - Enriches the original candidate tracker with detailed score breakdowns (_Semantic Score, Normalized Score, Exact Score, Final Score, Rank_) and exports ready-to-use Excel sheets.
+1. **Non-Blocking Background Execution & Live 10-Stage Progress**:
+   - `POST /api/recruitment/search` instantly returns `HTTP 202 Accepted` with a backend-generated `job_id`.
+   - The recruitment pipeline executes concurrently in the background.
+   - Streamlit polls `GET /api/recruitment/jobs/{job_id}/status` to render real-time progress across all 10 stages (`Ingestion`, `JD Extraction`, `Resume Download`, `Text Extraction`, `Vector Store Creation`, `Semantic Search`, `Exact Search`, `Evidence Aggregation`, `Reranking`, `Excel Export`).
+2. **Multi-Granularity Hybrid Retrieval**:
+   - **Whole Resume Search**: Evaluates broad domain fit and candidate background.
+   - **Chunk-Level Search**: Matches specific project accomplishments and detailed technical tasks.
+   - **Requirement-Level Semantic Search**: Queries candidate resume chunks against each extracted JD requirement independently.
+   - **Deterministic Exact Matching**: Strict keyword verification for mandatory skills, tools, and certifications.
+3. **AI Structured Requirement Extraction**:
+   - Uses resilient LLM extraction with strict Pydantic schemas across **OpenAI** and **Gemini** providers with automatic fallback.
+   - Faithfully categorizes criteria into _Required Skills_, _Preferred Skills_, _Experience_, and _Education_.
+4. **Multi-Aspect Weighted Reranking & Cohort Normalization**:
+   - Ranks candidates using a weighted formula combining normalized semantic similarity and exact term matching.
+   - Dynamically inverts and scales Euclidean distances into intuitive $[0.0, 1.0]$ relevance scores.
+5. **Isolated Request-Scoped Workspaces & Synchronized Cleanup**:
+   - Every search request runs in its own dedicated, isolated workspace under `data/runs/<job_id>/` (`input/`, `resumes/`, `output/`).
+   - 1-hour automatic retention cleanup safely purges expired directories and in-memory status entries synchronously.
+6. **Optimized Shared Model Lifecycle**:
+   - The heavy embedding model (`all-mpnet-base-v2`) is loaded **once** at server startup via FastAPI `lifespan` and reused across requests.
+   - FAISS vector stores remain strictly ephemeral and request-scoped in memory.
+7. **Structured Safe Error Handling & Rotating Logs**:
+   - Sanitizes and classifies failures (e.g. `LLM_RATE_LIMIT_ERROR`, `INPUT_VALIDATION_ERROR`) without leaking sensitive API keys.
+   - Logs to both console and a rotating file (`logs/server.log`, max 10MB, 5 backups).
 
 ---
 
 ## 🏗️ System Architecture
 
 ```mermaid
-flowchart TB
-    subgraph UI ["Client Layer (Streamlit)"]
-        A["Recruiter / User"] --> B["Streamlit UI"]
-        B -->|"Upload JD & Candidate Excel + Set Weights"| C["API Client"]
-        D["Ranked Results & Excel Download"] --> B
+flowchart TD
+    subgraph UI ["Client Layer (Streamlit Frontend - Port 8501)"]
+        User["Recruiter / HR User"] --> Streamlit["Streamlit Web UI"]
+        Streamlit -->|"1. POST /api/recruitment/search (JD + Tracker.xlsx)"| Search_API["FastAPI Search Endpoint"]
+        Search_API -->|"2. HTTP 202 Accepted {job_id, status: running}"| Streamlit
+        Streamlit -->|"3. GET /api/recruitment/jobs/{job_id}/status (every 800ms)"| Status_API["Status Polling Endpoint"]
+        Status_API -->|"4. Real-time 10-Stage Checklist / Final Results"| Streamlit
+        Streamlit -->|"5. GET /api/recruitment/download/{job_id}"| Download["Download Enriched Excel"]
     end
 
-    subgraph API ["Backend Layer (FastAPI)"]
-        C -->|"POST /api/recruitment/search"| E["Search Endpoint"]
-        
-        subgraph JD_Pipeline ["1. Job Description Analysis"]
-            E --> F["Unified Document Extractor (PDF/DOCX/TXT)"]
-            F --> G["LLM Structured Extractor (Pydantic Requirements)"]
+    subgraph Backend ["Backend Engine (FastAPI - Port 8000)"]
+        direction TB
+
+        Lifespan["FastAPI Lifespan Startup<br/>(Loads sentence-transformers/all-mpnet-base-v2 once)"]
+        StatusStore[("Thread-Safe Status Store<br/>_job_statuses[job_id]")]
+        Logger["Rotating File Logger<br/>(logs/server.log + Console)"]
+
+        subgraph Ingestion ["1. Request Ingestion & Workspace Isolation"]
+            Workspace["JobWorkspace (data/runs/<job_id>/)"]
+            DocExtract["JD Text Extractor (PDF / DOCX / TXT)"]
+            TrackerRead["Candidate Tracker Parser (.xlsx)"]
+            ResumeDL["S3 / URL Resume Downloader"]
+            ResumeExtract["Resume Text Extractor"]
         end
 
-        subgraph Storage ["Pre-indexed Data Stores"]
-            DB1[("Resume Text Store (JSON)")]
-            DB2[("Resume Vector Store (FAISS)")]
+        subgraph Processing ["2. AI Requirement Extraction"]
+            LLM["LLM Executor (Gemini 2.5 Flash / GPT-5.6 Luna Fallback)"]
+            Requirements["Structured JD Requirements (Pydantic)"]
         end
 
-        subgraph Retrieval ["2. Hybrid Retrieval Engine"]
-            G --> H["Semantic Retriever (Whole + Chunk + Requirement)"]
-            G --> I["Exact Keyword Retriever (Skill/Exp/Edu Matching)"]
-            DB2 --> H
-            DB1 --> I
-            
-            H --> J["Candidate Aggregator"]
-            I --> J
+        subgraph Retrieval ["3. Hybrid Retrieval & Reranking"]
+            Chunking["Resume Chunker (Whole Resume + Chunks)"]
+            FAISS_Store["Ephemeral In-Memory FAISS Vector Store"]
+            SemanticSearch["Semantic Search (JD + Requirements)"]
+            ExactSearch["Exact Keyword Matching"]
+            Aggregator["Candidate Aggregator (by source_row)"]
+            Reranker["Weighted Reranker & Cohort Normalizer"]
         end
 
-        subgraph Rerank ["3. Weighted Reranker & Export"]
-            J --> K["Reranker & Normalizer"]
-            E -.->|"Weights"| K
-            K --> L["Excel Exporter"]
-            E -.->|"Original Excel"| L
-            L --> M["ranked_candidates.xlsx"]
+        subgraph Export ["4. Export & Lifecycle Management"]
+            Exporter["Excel Exporter (ranked_candidates.xlsx)"]
+            Cleanup["Synchronized Disk & Memory Cleanup (1h Retention)"]
         end
     end
 
-    K -->|"Ranked Candidates JSON"| D
-    M -->|"Downloadable File Stream"| D
+    Search_API -->|"Create"| Workspace
+    Search_API -->|"Register"| StatusStore
+    Search_API -->|"BackgroundTasks.add_task"| PipelineRunner["Background Pipeline Execution"]
+
+    PipelineRunner --> DocExtract & TrackerRead
+    PipelineRunner -.->|"Update Stage 1..10"| StatusStore
+    TrackerRead --> ResumeDL --> ResumeExtract --> Chunking
+    DocExtract --> LLM --> Requirements
+    Lifespan ==>|"Inject Shared Model"| FAISS_Store
+    Chunking --> FAISS_Store
+    Requirements & FAISS_Store --> SemanticSearch
+    Requirements & ResumeExtract --> ExactSearch
+    SemanticSearch & ExactSearch --> Aggregator --> Reranker --> Exporter
+    Exporter --> Cleanup
+    Cleanup -->|"Evict Expired"| Workspace & StatusStore
 ```
 
 ---
@@ -79,31 +105,45 @@ flowchart TB
 ```text
 palle-candidate-retrieval-system/
 ├── data/
-│   ├── resumes/               # Downloaded candidate resumes
-│   ├── processed/             # Processed resume JSON store
-│   ├── vector_store/          # FAISS vector store indices
-│   └── output/                # Generated ranked Excel sheets
+│   └── runs/                  # Request-scoped isolated workspaces (data/runs/<job_id>/)
+│       └── .gitkeep
+├── logs/                      # Server log directory (rotating server.log)
+│       └── .gitkeep
 ├── src/
 │   ├── api/
-│   │   └── main.py            # FastAPI application endpoints
+│   │   └── main.py            # FastAPI application, lifespan lifecycle & endpoints
+│   ├── common/
+│   │   ├── errors.py          # Structured error models & classification
+│   │   └── job_workspace.py   # Request isolation & filesystem lifecycle
+│   ├── export/
+│   │   └── excel_exporter.py  # Enriched ranked Excel generator
 │   ├── ingestion/
-│   │   ├── xlsx_reader.py     # Candidate Excel parser
-│   │   ├── resume_downloader.py
-│   │   ├── resume_text_extractor.py
 │   │   ├── document_text_extractor.py # Unified PDF/DOCX/TXT extractor
-│   │   └── resume_text_store.py
+│   │   ├── resume_downloader.py       # S3 / HTTP resume downloader
+│   │   ├── resume_text_extractor.py   # Resume PDF/DOCX text extraction
+│   │   └── xlsx_reader.py             # Candidate Excel validation & parser
+│   ├── llm/
+│   │   ├── llm_factory.py     # Multi-provider LLM initializers (Gemini / OpenAI)
+│   │   └── llm_executor.py    # Fallback retry executor
 │   ├── processing/
-│   │   └── jd_requirements.py # LLM-based structured JD requirement extraction
-│   ├── retrieval/
-│   │   ├── resume_vector_store.py
-│   │   ├── semantic_retriever.py
-│   │   ├── exact_retriever.py
-│   │   ├── candidate_aggregator.py
-│   │   └── reranker.py
-│   └── export/
-│       └── excel_exporter.py  # Ranked Excel generator
-├── streamlit_app.py           # Streamlit Web UI
-├── requirements.txt
+│   │   └── jd_requirements.py # LLM structured requirement extraction
+│   └── retrieval/
+│       ├── candidate_aggregator.py # Multi-aspect candidate aggregation
+│       ├── exact_retriever.py      # Substring exact term retriever
+│       ├── reranker.py             # Mathematical scoring & cohort normalization
+│       ├── resume_vector_store.py  # mpnet-base-v2 model & FAISS factory
+│       └── semantic_retriever.py   # Semantic similarity retriever
+├── tests/
+│   ├── test_e2e_search.py          # End-to-end integration tests
+│   ├── test_embedding_lifecycle.py # Lifespan & shared model reuse tests
+│   ├── test_error_handling.py      # API & LLM error classification tests
+│   ├── test_excel_status.py        # Excel export status reporting tests
+│   ├── test_job_lifecycle.py       # Job isolation & path traversal tests
+│   ├── test_job_status.py          # Real-time progress & status tracking tests
+│   └── test_ranking_logic.py       # Mathematical scoring & monotonicity tests
+├── streamlit_app.py           # Streamlit Frontend Web UI
+├── requirements.txt           # Project dependencies
+├── pytest.ini                 # Pytest configuration
 └── README.md
 ```
 
@@ -111,82 +151,88 @@ palle-candidate-retrieval-system/
 
 ## 🛠️ Setup & Installation
 
-You can get started either by **cloning the GitHub repository** or from a **local directory copy**.
+### 1. Prerequisites
 
-### Option A: Start with Git Repository
+- Python 3.10+
+- Git
 
-```bash
-# 1. Clone the repository
+### 2. Clone Repository & Setup Virtual Environment
+
+```powershell
+# Clone repo
 git clone https://github.com/Narasimha-kambham/palle-candidate-retrieval-system.git
 cd palle-candidate-retrieval-system
 
-# 2. Create virtual environment
+# Create virtual environment
 python -m venv .venv
 
-# 3. Activate virtual environment
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# Windows (Command Prompt):
-.venv\Scripts\activate.bat
-# Linux / macOS:
-source .venv/bin/activate
+# (Windows PowerShell only - if script execution is blocked on your system):
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
 
-# 4. Install dependencies
-pip install -r requirements.txt
-```
+# Activate virtual environment (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
 
-### Option B: Start from Existing Local Directory
+# (Windows Command Prompt)
+# .venv\Scripts\activate.bat
 
-```bash
-# 1. Open the project folder
-cd d:/palle-candidate-retrieval-system
+# (Linux / macOS)
+# source .venv/bin/activate
 
-# 2. Create and activate virtual environment (if not already created)
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-
-# 3. Install dependencies
+# Install dependencies
 pip install -r requirements.txt
 ```
 
 ---
 
-### 🔑 Environment Variables
+### 3. Configure Environment Variables
 
-Create a `.env` file in the project root directory:
+Create a `.env` file in the root directory:
 
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+# Google Gemini API Key
+GEMINI_API_KEY=your_google_gemini_api_key
+
+# OpenAI API Key (for fallback)
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 ---
 
-## ⚡ Running the Application
+## ⚡ Running the System
 
 ### 1. Start the FastAPI Backend
 
-```bash
+```powershell
 uvicorn src.api.main:app --reload --port 8000
 ```
 
-- Interactive API Docs (Swagger): [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Backend API**: `http://localhost:8000`
+- **Interactive Swagger Docs**: `http://localhost:8000/docs`
 
 ### 2. Start the Streamlit Frontend
 
-```bash
+In a separate terminal window:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
 streamlit run streamlit_app.py
 ```
 
-- Frontend UI: [http://localhost:8501](http://localhost:8501)
+- **Web Interface**: `http://localhost:8501`
 
 ---
 
-## 📊 End-to-End Workflow
+## 🧪 Running Tests
 
-1. **Upload**: Provide a Job Description (PDF/DOCX/TXT or pasted text) and a Candidate Tracker (`.xlsx`).
-2. **Configure Weights**: Adjust semantic vs. exact match weights based on recruitment criteria.
-3. **Retrieve & Rerank**: The system performs multi-aspect semantic vector search and exact term matching, normalizes distances, and reranks candidates.
-4. **Export**: View the ranked results table on the UI and download the enriched Excel report.
+To run the automated test suite:
+
+```powershell
+# Run all unit, lifecycle, and ranking tests:
+pytest tests/test_job_lifecycle.py tests/test_ranking_logic.py tests/test_excel_status.py tests/test_embedding_lifecycle.py tests/test_error_handling.py -v
+
+# Run full suite:
+pytest -v
+```
 
 ---
 

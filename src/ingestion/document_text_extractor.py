@@ -73,23 +73,3 @@ def extract_document_text(filepath=None, raw_text=None):
             f"Unsupported document format: {suffix}. "
             "Please provide a .pdf, .docx, or .txt file."
         )
-
-
-if __name__ == "__main__":
-    pdf_path = 'data/JD_Forward Deployed Engineer Intern (6 months -Paid).pdf'
-    doc_path = 'data/jd2.docx'
-    jd = """
-        We are looking for a Python Developer.
-
-        Requirements:
-        Python
-        Django
-        PostgreSQL
-    """
-
-    result = extract_text_from_text(jd)
-
-    print(result)
-
-
-    

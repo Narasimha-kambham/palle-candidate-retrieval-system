@@ -28,21 +28,3 @@ def load_candidates(file_path):
         })
 
     return candidates
-
-
-if __name__ == "__main__":
-    import os
-    from .resume_downloader import download_all_resumes
-    from .resume_text_extractor import extract_all_resume_texts
-    from .resume_text_store import load_resume_texts, save_resume_texts
-
-    print("Current working directory:", os.getcwd())
-    print("This Python file:", __file__)
-
-    candidates = load_candidates("data/Tracker.xlsx")
-
-    download_results = download_all_resumes(candidates)
-
-    text_results = extract_all_resume_texts(download_results)
-
-    save_resume_texts(text_results)

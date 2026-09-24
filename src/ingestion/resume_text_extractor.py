@@ -49,8 +49,8 @@ def extract_all_resume_texts(resume_records):
 
 if __name__ == "__main__":
 
-    pdf_path = "data/resumes/25659.pdf"
-    docx_path = "data/resumes/25779.docx"
+    pdf_path = "data/runs/test_job/resumes/25659.pdf"
+    docx_path = "data/runs/test_job/resumes/25779.docx"
 
     pdf_text = extract_resume_text(pdf_path)
     print(pdf_text[:1000])
