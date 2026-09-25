@@ -115,23 +115,65 @@ st.caption("Configure weights below to experiment with retrieval and ranking beh
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    semantic_weight = st.slider("Semantic Weight", 0.0, 1.0, DEFAULT_SEMANTIC_WEIGHT, 0.05)
+    semantic_weight = st.slider(
+        "Semantic Weight",
+        0.0,
+        1.0,
+        DEFAULT_SEMANTIC_WEIGHT,
+        0.05,
+        help="How much importance should be given to the candidate's overall experience and context matching the job description, even when different words are used."
+    )
 with col2:
-    exact_weight = st.slider("Exact Match Weight", 0.0, 1.0, DEFAULT_EXACT_WEIGHT, 0.05)
+    exact_weight = st.slider(
+        "Exact Match Weight",
+        0.0,
+        1.0,
+        DEFAULT_EXACT_WEIGHT,
+        0.05,
+        help="How much importance should be given to specific skills, technologies, or terms explicitly mentioned in the job description."
+    )
 with col3:
-    top_k = st.number_input("Top Candidates (Top K)", min_value=1, max_value=100, value=DEFAULT_TOP_K, step=1)
+    top_k = st.number_input(
+        "Top Candidates (Top K)",
+        min_value=1,
+        max_value=100,
+        value=DEFAULT_TOP_K,
+        step=1,
+        help="How many of the highest-ranked candidates should be returned in the results."
+    )
 
 st.markdown("#### Semantic Retrieval Weights")
 
 col_sem1, col_sem2 = st.columns(2)
 with col_sem1:
     st.markdown("##### Whole JD Matching")
-    whole_resume_weight = st.slider("Whole Resume Weight", 0.0, 1.0, DEFAULT_WHOLE_RESUME_WEIGHT, 0.05)
-    best_chunk_weight = st.slider("Best Chunk Weight", 0.0, 1.0, DEFAULT_BEST_CHUNK_WEIGHT, 0.05)
+    whole_resume_weight = st.slider(
+        "Whole Resume Weight",
+        0.0,
+        1.0,
+        DEFAULT_WHOLE_RESUME_WEIGHT,
+        0.05,
+        help="How much importance should be given to how well the candidate's overall resume matches the overall job description."
+    )
+    best_chunk_weight = st.slider(
+        "Best Chunk Weight",
+        0.0,
+        1.0,
+        DEFAULT_BEST_CHUNK_WEIGHT,
+        0.05,
+        help="How much importance should be given to the strongest relevant section or part of the candidate's resume when compared with the overall job description."
+    )
 
 with col_sem2:
     st.markdown("##### Requirement-Level Matching")
-    best_requirement_weight = st.slider("Best Requirement Weight", 0.0, 1.0, DEFAULT_BEST_REQUIREMENT_WEIGHT, 0.05)
+    best_requirement_weight = st.slider(
+        "Best Requirement Weight",
+        0.0,
+        1.0,
+        DEFAULT_BEST_REQUIREMENT_WEIGHT,
+        0.05,
+        help="How much importance should be given to how well the candidate matches the individual requirements identified from the job description."
+    )
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
