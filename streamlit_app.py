@@ -125,7 +125,7 @@ st.markdown("#### Semantic Retrieval Weights")
 
 col_sem1, col_sem2 = st.columns(2)
 with col_sem1:
-    st.markdown("##### Resume-Level Matching")
+    st.markdown("##### Whole JD Matching")
     whole_resume_weight = st.slider("Whole Resume Weight", 0.0, 1.0, DEFAULT_WHOLE_RESUME_WEIGHT, 0.05)
     best_chunk_weight = st.slider("Best Chunk Weight", 0.0, 1.0, DEFAULT_BEST_CHUNK_WEIGHT, 0.05)
 
